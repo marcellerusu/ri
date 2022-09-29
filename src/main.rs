@@ -10,9 +10,9 @@ fn eval(file_contents: String) -> Result<(), ParseError> {
         Ok(tokens) => {
             let mut parser = parser::Parser::new(tokens);
             let ast = parser.parse()?;
-            // let interpreter = interpreter::Interpreter::new(ast);
-            // let output = interpreter.eval();
-            println!("{:?}", ast);
+            let mut interpreter = interpreter::Interpreter::new(ast);
+            let output = interpreter.eval();
+            println!("{:?}", output);
         }
         Err(err) => {
             println!("failed to tokenize {:?}", err);

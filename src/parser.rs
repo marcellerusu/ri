@@ -8,7 +8,7 @@ pub struct Parser {
     index: usize,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum AST {
     Num(i32),
     Add(Box<AST>, Box<AST>),
@@ -61,6 +61,7 @@ impl Parser {
     fn consume_plus_operand(&mut self) -> Result<AST, ParseError> {
         self.consume(|t| match t {
             Token::Num(num) => Some(AST::Num(num)),
+            Token::Id(name) => Some(AST::Id(name)),
             _ => None,
         })
     }
@@ -100,7 +101,10 @@ impl Parser {
         match (self.cur(), self.peek()) {
             (_, Some(Token::Plus)) => self.parse_plus(),
             (Some(Token::Let), Some(Token::Id(_))) => self.parse_let(),
-            (Some(Token::Num(num)), _) => Ok(AST::Num(num)),
+            (Some(Token::Num(_)), _) => self.consume(|t| match t {
+                Token::Num(num) => Some(AST::Num(num)),
+                _ => None,
+            }),
             (None, _) => Err(ParseError::NoMoreTokens),
             _ => {
                 println!("Unimplemented token");
