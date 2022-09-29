@@ -12,6 +12,9 @@ pub struct Parser {
 pub enum AST {
     Num(i32),
     Add(Box<AST>, Box<AST>),
+    Div(Box<AST>, Box<AST>),
+    Mul(Box<AST>, Box<AST>),
+    Minus(Box<AST>, Box<AST>),
     Id(String),
     Let(Box<AST>, Box<AST>),
 }
@@ -58,7 +61,7 @@ impl Parser {
         }
     }
 
-    fn consume_plus_operand(&mut self) -> Result<AST, ParseError> {
+    fn consume_math_operand(&mut self) -> Result<AST, ParseError> {
         self.consume(|t| match t {
             Token::Num(num) => Some(AST::Num(num)),
             Token::Id(name) => Some(AST::Id(name)),
@@ -66,20 +69,45 @@ impl Parser {
         })
     }
 
-    fn consume_plus(&mut self) -> Result<(), ParseError> {
+    fn parse_plus(&mut self) -> Result<AST, ParseError> {
+        let lhs = self.consume_math_operand()?;
         self.consume_and_ignore(|t| match t {
             Token::Plus => true,
             _ => false,
-        })
-    }
-
-    fn parse_plus(&mut self) -> Result<AST, ParseError> {
-        let lhs = self.consume_plus_operand()?;
-        self.consume_plus()?;
-        let rhs = self.consume_plus_operand()?;
+        })?;
+        let rhs = self.consume_math_operand()?;
         Ok(AST::Add(Box::new(lhs), Box::new(rhs)))
     }
 
+    fn parse_mul(&mut self) -> Result<AST, ParseError> {
+        let lhs = self.consume_math_operand()?;
+        self.consume_and_ignore(|t| match t {
+            Token::Times => true,
+            _ => false,
+        })?;
+        let rhs = self.consume_math_operand()?;
+        Ok(AST::Mul(Box::new(lhs), Box::new(rhs)))
+    }
+
+    fn parse_div(&mut self) -> Result<AST, ParseError> {
+        let lhs = self.consume_math_operand()?;
+        self.consume_and_ignore(|t| match t {
+            Token::Div => true,
+            _ => false,
+        })?;
+        let rhs = self.consume_math_operand()?;
+        Ok(AST::Div(Box::new(lhs), Box::new(rhs)))
+    }
+
+    fn parse_minus(&mut self) -> Result<AST, ParseError> {
+        let lhs = self.consume_math_operand()?;
+        self.consume_and_ignore(|t| match t {
+            Token::Minus => true,
+            _ => false,
+        })?;
+        let rhs = self.consume_math_operand()?;
+        Ok(AST::Minus(Box::new(lhs), Box::new(rhs)))
+    }
     fn parse_let(&mut self) -> Result<AST, ParseError> {
         self.consume_and_ignore(|t| match t {
             Token::Let => true,
@@ -100,6 +128,9 @@ impl Parser {
     fn parse_node(&mut self) -> Result<AST, ParseError> {
         match (self.cur(), self.peek()) {
             (_, Some(Token::Plus)) => self.parse_plus(),
+            (_, Some(Token::Minus)) => self.parse_minus(),
+            (_, Some(Token::Div)) => self.parse_div(),
+            (_, Some(Token::Times)) => self.parse_mul(),
             (Some(Token::Let), Some(Token::Id(_))) => self.parse_let(),
             (Some(Token::Num(_)), _) => self.consume(|t| match t {
                 Token::Num(num) => Some(AST::Num(num)),

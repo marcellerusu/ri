@@ -14,6 +14,9 @@ fn re(regex_str: &str) -> Regex {
 pub enum Token {
     Num(i32),
     Plus,
+    Minus,
+    Times,
+    Div,
     Let,
     Eq,
     Id(String),
@@ -51,6 +54,12 @@ impl Lexer {
                 tokens.push(Token::Num(digit.parse::<i32>().unwrap()))
             } else if let Some(_) = self.scan(re(r"\+")) {
                 tokens.push(Token::Plus)
+            } else if let Some(_) = self.scan(re(r"\*")) {
+                tokens.push(Token::Times)
+            } else if let Some(_) = self.scan(re(r"/")) {
+                tokens.push(Token::Div)
+            } else if let Some(_) = self.scan(re(r"\-")) {
+                tokens.push(Token::Minus)
             } else if let Some(_) = self.scan(re(r"let\b")) {
                 tokens.push(Token::Let)
             } else if let Some(name) = self.scan(re(r"[a-zA-Z]+")) {

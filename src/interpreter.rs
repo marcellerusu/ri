@@ -15,15 +15,39 @@ impl Interpreter {
         }
     }
 
-    fn add(&mut self, lhs: &AST, rhs: &AST) -> i32 {
-        match [lhs, rhs] {
-            [AST::Num(lhs), AST::Num(rhs)] => lhs + rhs,
-            [AST::Id(name), AST::Num(rhs)] => match self.vars.get(name) {
-                Some(val) => val + rhs,
+    fn to_i(&self, node: &AST) -> i32 {
+        match node.clone() {
+            AST::Num(num) => num,
+            AST::Id(name) => match self.vars.get(&name) {
+                Some(val) => val.clone(),
                 None => panic!("Couldn't find value for var: {:?}", name),
             },
             _ => panic!("expected numbers"),
         }
+    }
+
+    fn add(&mut self, lhs: &AST, rhs: &AST) -> i32 {
+        let lhs = self.to_i(lhs);
+        let rhs = self.to_i(rhs);
+        lhs + rhs
+    }
+
+    fn minus(&mut self, lhs: &AST, rhs: &AST) -> i32 {
+        let lhs = self.to_i(lhs);
+        let rhs = self.to_i(rhs);
+        lhs - rhs
+    }
+
+    fn div(&mut self, lhs: &AST, rhs: &AST) -> i32 {
+        let lhs = self.to_i(lhs);
+        let rhs = self.to_i(rhs);
+        lhs / rhs
+    }
+
+    fn mul(&mut self, lhs: &AST, rhs: &AST) -> i32 {
+        let lhs = self.to_i(lhs);
+        let rhs = self.to_i(rhs);
+        lhs * rhs
     }
 
     fn assign(&mut self, id: &AST, num: &AST) {
@@ -42,11 +66,18 @@ impl Interpreter {
             match node {
                 AST::Add(lhs, rhs) => {
                     result = self.add(lhs.as_ref(), rhs.as_ref());
-                    ()
+                }
+                AST::Div(lhs, rhs) => {
+                    result = self.div(lhs.as_ref(), rhs.as_ref());
+                }
+                AST::Mul(lhs, rhs) => {
+                    result = self.mul(lhs.as_ref(), rhs.as_ref());
+                }
+                AST::Minus(lhs, rhs) => {
+                    result = self.minus(lhs.as_ref(), rhs.as_ref());
                 }
                 AST::Let(id, num) => {
                     self.assign(id.as_ref(), num.as_ref());
-                    ()
                 }
                 _ => panic!("unexpected {:?}", node),
             }
