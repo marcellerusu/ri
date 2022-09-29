@@ -1,4 +1,6 @@
-let a = 10
-let c = 40 - 20
+fn add(c, d) = c + d
 
-c * 10
+let a = 10
+let b = 40 - 20
+
+add(b, a)
