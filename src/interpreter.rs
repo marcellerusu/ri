@@ -50,13 +50,25 @@ impl Interpreter {
         lhs * rhs
     }
 
-    fn assign(&mut self, id: &AST, num: &AST) {
-        match (id, num) {
-            (AST::Id(id), AST::Num(num)) => {
-                self.vars.insert(id.clone(), num.clone());
+    fn assign(&mut self, id: &AST, rhs: &AST) {
+        match id {
+            AST::Id(id) => {
+                let rhs = self.eval_expr(rhs.clone());
+                self.vars.insert(id.clone(), rhs);
                 ()
             }
             _ => panic!("umm"),
+        }
+    }
+
+    fn eval_expr(&mut self, expr: AST) -> i32 {
+        match expr {
+            AST::Add(lhs, rhs) => self.add(lhs.as_ref(), rhs.as_ref()),
+            AST::Div(lhs, rhs) => self.div(lhs.as_ref(), rhs.as_ref()),
+            AST::Mul(lhs, rhs) => self.mul(lhs.as_ref(), rhs.as_ref()),
+            AST::Minus(lhs, rhs) => self.minus(lhs.as_ref(), rhs.as_ref()),
+            AST::Num(num) => num,
+            _ => panic!("unexpected {:?}", expr),
         }
     }
 
@@ -64,22 +76,10 @@ impl Interpreter {
         let mut result = 0;
         for node in self.ast.clone() {
             match node {
-                AST::Add(lhs, rhs) => {
-                    result = self.add(lhs.as_ref(), rhs.as_ref());
+                AST::Let(id, expr) => {
+                    self.assign(id.as_ref(), expr.as_ref());
                 }
-                AST::Div(lhs, rhs) => {
-                    result = self.div(lhs.as_ref(), rhs.as_ref());
-                }
-                AST::Mul(lhs, rhs) => {
-                    result = self.mul(lhs.as_ref(), rhs.as_ref());
-                }
-                AST::Minus(lhs, rhs) => {
-                    result = self.minus(lhs.as_ref(), rhs.as_ref());
-                }
-                AST::Let(id, num) => {
-                    self.assign(id.as_ref(), num.as_ref());
-                }
-                _ => panic!("unexpected {:?}", node),
+                _ => result = self.eval_expr(node),
             }
         }
         result
