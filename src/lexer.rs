@@ -13,6 +13,7 @@ fn re(regex_str: &str) -> Regex {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Token {
     Num(i32),
+    Str(String),
     Id(String),
     Fn,
     OpenParen,
@@ -68,13 +69,23 @@ impl Lexer {
                 tokens.push(Token::Let)
             } else if let Some(_) = self.scan(re(r"=")) {
                 tokens.push(Token::Eq)
+            } else if let Some(_) = self.scan(re("\"")) {
+                let mut string = "".to_string();
+                for c in self.rest_of_string().chars() {
+                    self.index += 1;
+                    if c == '"' {
+                        break;
+                    }
+                    string.push(c);
+                }
+                tokens.push(Token::Str(string))
             } else if let Some(_) = self.scan(re(r"fn\b")) {
                 tokens.push(Token::Fn)
             } else if let Some(_) = self.scan(re(r"\(")) {
                 tokens.push(Token::OpenParen)
             } else if let Some(_) = self.scan(re(r"\)")) {
                 tokens.push(Token::CloseParen)
-            } else if let Some(name) = self.scan(re(r"[a-zA-Z]+")) {
+            } else if let Some(name) = self.scan(re(r"[a-zA-Z_]+")) {
                 tokens.push(Token::Id(name))
             } else if let Some(_) = self.scan(re(r",")) {
                 tokens.push(Token::Comma)

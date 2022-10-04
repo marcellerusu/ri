@@ -1,6 +1,0 @@
-fn add(c, d) = c + d
-
-let a = 10
-let b = 40 - 20
-
-add(b, a)

@@ -11,6 +11,7 @@ pub struct Parser {
 #[derive(Debug, Clone)]
 pub enum AST {
     Num(i32),
+    Str(String),
     Add(Box<AST>, Box<AST>),
     Div(Box<AST>, Box<AST>),
     Mul(Box<AST>, Box<AST>),
@@ -47,7 +48,7 @@ impl Parser {
             self.index += 1;
             Ok(result)
         } else {
-            println!("Unexpected");
+            println!("Unexpected {:?}", cond_fn);
             Err(ParseError::Unexpected(token))
         }
     }
@@ -60,13 +61,22 @@ impl Parser {
         })
     }
 
+    fn consume_plus_operand(&mut self) -> Result<AST, ParseError> {
+        self.consume(|t| match t {
+            Token::Num(num) => Some(AST::Num(num)),
+            Token::Str(string) => Some(AST::Str(string)),
+            Token::Id(name) => Some(AST::Id(name)),
+            _ => None,
+        })
+    }
+
     fn parse_plus(&mut self) -> Result<AST, ParseError> {
-        let lhs = self.consume_math_operand()?;
+        let lhs = self.consume_plus_operand()?;
         self.consume(|t| match t {
             Token::Plus => Some(()),
             _ => None,
         })?;
-        let rhs = self.consume_math_operand()?;
+        let rhs = self.consume_plus_operand()?;
         Ok(AST::Add(Box::new(lhs), Box::new(rhs)))
     }
 
@@ -197,6 +207,10 @@ impl Parser {
             (Some(Token::Let), Some(Token::Id(_))) => self.parse_let(),
             (Some(Token::Num(_)), _) => self.consume(|t| match t {
                 Token::Num(num) => Some(AST::Num(num)),
+                _ => None,
+            }),
+            (Some(Token::Str(_)), _) => self.consume(|t| match t {
+                Token::Str(string) => Some(AST::Str(string)),
                 _ => None,
             }),
             (Some(Token::Id(_)), _) => self.consume(|t| match t {
