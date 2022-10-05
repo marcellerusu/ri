@@ -5,7 +5,7 @@ use crate::parser::AST;
 #[derive(Clone)]
 struct Fn {
     args: Vec<String>,
-    expr: AST,
+    body: Vec<AST>,
 }
 
 #[derive(Clone, Debug)]
@@ -121,8 +121,8 @@ impl Interpreter {
         }
     }
 
-    fn define(&mut self, name: String, args: Vec<String>, expr: AST) -> Value {
-        self.fns.insert(name, Fn { args, expr });
+    fn define(&mut self, name: String, args: Vec<String>, body: Vec<AST>) -> Value {
+        self.fns.insert(name, Fn { args, body });
         Value::Nil
     }
 
@@ -138,7 +138,7 @@ impl Interpreter {
             Value::Nil
         } else if let Some(Fn {
             args: fn_args,
-            expr,
+            body,
         }) = self.fns.get(&name)
         {
             let mut context = self.vars.clone();
@@ -167,7 +167,7 @@ impl Interpreter {
             }
             // println!("calling function with {:?}", context);
 
-            Interpreter::new_with_context(vec![expr.clone()], context, self.fns.clone()).eval()
+            Interpreter::new_with_context(body.to_vec(), context, self.fns.clone()).eval()
         } else {
             panic!("Function not found {}", name);
         }
@@ -256,7 +256,7 @@ impl Interpreter {
         for node in self.ast.clone() {
             result = match node {
                 AST::Let(id, expr) => self.assign(id.as_ref(), expr.as_ref()),
-                AST::Def(name, args, expr) => self.define(name, args, *expr),
+                AST::Def(name, args, body) => self.define(name, args, body),
                 _ => self.eval_expr(node),
             }
         }

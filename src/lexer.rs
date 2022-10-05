@@ -29,6 +29,7 @@ pub enum Token {
     Eq,
     Dot,
     Nil,
+    End,
 }
 
 impl Token {
@@ -134,6 +135,12 @@ impl Token {
             _ => None,
         }
     }
+    pub fn as_end(&self) -> Option<()> {
+        match self {
+            Token::End => Some(()),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -178,6 +185,8 @@ impl Lexer {
                 tokens.push(Token::CloseSq)
             } else if self.scan(re(r"\.")).is_some() {
                 tokens.push(Token::Dot)
+            } else if self.scan(re(r"end\b")).is_some() {
+                tokens.push(Token::End)
             } else if self.scan(re(r"/")).is_some() {
                 tokens.push(Token::Div)
             } else if self.scan(re(r"\-")).is_some() {

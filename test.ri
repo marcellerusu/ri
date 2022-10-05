@@ -2,10 +2,13 @@ let arr = [1, 2, "3"]
 
 let b = arr.join(" - ")
 
-fn add(a, b) = a / b
+fn add(a, b)
+  a / b
+end
 
 let result = add(b=40, a=20)
 
-# let val = nil
+let val = nil
 [b, result, arr]
-print(val)
+
+print(add(b=2, a=1))

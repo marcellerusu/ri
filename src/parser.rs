@@ -22,7 +22,7 @@ pub enum AST {
     NamedArg(String, Box<AST>),
     Id(String),
     Let(Box<AST>, Box<AST>),
-    Def(String, Vec<String>, Box<AST>),
+    Def(String, Vec<String>, Vec<AST>),
     FnCall(Box<AST>, Vec<AST>),
 }
 
@@ -151,9 +151,18 @@ impl Parser {
         let name = self.consume(|t| t.as_id())?;
         self.consume(|t| t.as_open_paren())?;
         let arg_names = self.parse_comma_separated_ids()?;
-        self.consume(|t| t.as_eq())?;
-        let expr = self.parse_node()?;
-        Ok(AST::Def(name, arg_names, Box::new(expr)))
+        let mut body: Vec<AST> = vec![];
+        if matches!(self.cur(), Some(Token::Eq)) {
+            self.consume(|t| t.as_eq())?;
+            let expr = self.parse_node()?;
+            body.push(expr);
+        } else {
+            while !matches!(self.cur(), Some(Token::End)) {
+                body.push(self.parse_node()?);
+            }
+            self.consume(|t| t.as_end())?;
+        }
+        Ok(AST::Def(name, arg_names, body))
     }
 
     fn parse_fn_call(&mut self, lhs: AST) -> Result<AST, ParseError> {
