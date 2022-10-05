@@ -128,14 +128,8 @@ impl Interpreter {
         }
     }
 
-    fn define(&mut self, name: String, args: Vec<String>, expr: &AST) -> Value {
-        self.fns.insert(
-            name,
-            Fn {
-                args,
-                expr: expr.clone(),
-            },
-        );
+    fn define(&mut self, name: String, args: Vec<String>, expr: AST) -> Value {
+        self.fns.insert(name, Fn { args, expr });
         Value::Nil
     }
 
@@ -171,7 +165,7 @@ impl Interpreter {
                         }));
                     return Value::Str(str_arr.join(join_str));
                 } else {
-                    panic!("expected a string for join")
+                    panic!("Expected a string for join")
                 }
             }
             name => panic!("Unknown array method {}", name),
@@ -194,9 +188,7 @@ impl Interpreter {
         match lhs {
             AST::Id(name) => self.fn_call_from_id(name, args),
             AST::Dot(lhs, method_name) => self.fn_call_from_dot(*lhs, method_name, args),
-            _ => {
-                panic!("Unknown function expression {:?}", lhs);
-            }
+            _ => panic!("Unknown function expression {:?}", lhs),
         }
     }
 
@@ -209,9 +201,7 @@ impl Interpreter {
             AST::Num(num) => Value::Int(num),
             AST::Id(name) => match self.vars.get(&name) {
                 Some(value) => value.clone(),
-                None => {
-                    panic!("Var not found {}", name)
-                }
+                None => panic!("Var not found {}", name),
             },
             AST::FnCall(lhs, args) => self.fn_call(*lhs, args),
             AST::Str(string) => Value::Str(string),
@@ -246,7 +236,7 @@ impl Interpreter {
         for node in self.ast.clone() {
             result = match node {
                 AST::Let(id, expr) => self.assign(id.as_ref(), expr.as_ref()),
-                AST::Def(name, args, expr) => self.define(name, args, expr.as_ref()),
+                AST::Def(name, args, expr) => self.define(name, args, *expr),
                 _ => self.eval_expr(node),
             }
         }
