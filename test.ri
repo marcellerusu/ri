@@ -6,6 +6,6 @@ fn add(a, b) = a / b
 
 let result = add(b=40, a=20)
 
+# let val = nil
 [b, result, arr]
-let val = nil
-print(arr)
+print(val)

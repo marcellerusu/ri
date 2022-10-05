@@ -164,6 +164,8 @@ impl Lexer {
             // println!("{:?}", self.index);
             if self.scan(re(r"\s+")).is_some() {
                 continue;
+            } else if self.scan(re(r"#.*")).is_some() {
+                continue;
             } else if let Some(digit) = self.scan(re(r"\d+")) {
                 tokens.push(Token::Num(digit.parse::<i32>().unwrap()))
             } else if self.scan(re(r"\+")).is_some() {
