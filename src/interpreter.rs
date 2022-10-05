@@ -207,6 +207,7 @@ impl Interpreter {
             AST::Div(lhs, rhs) => Value::Int(self.div(lhs.as_ref(), rhs.as_ref())),
             AST::Mul(lhs, rhs) => Value::Int(self.mul(lhs.as_ref(), rhs.as_ref())),
             AST::Minus(lhs, rhs) => Value::Int(self.minus(lhs.as_ref(), rhs.as_ref())),
+            AST::Nil => Value::Nil,
             AST::Num(num) => Value::Int(num),
             AST::Id(name) => match self.vars.get(&name) {
                 Some(value) => value.clone(),

@@ -28,6 +28,7 @@ pub enum Token {
     Let,
     Eq,
     Dot,
+    Nil,
 }
 
 impl Token {
@@ -127,6 +128,12 @@ impl Token {
             _ => None,
         }
     }
+    pub fn as_nil(&self) -> Option<()> {
+        match self {
+            Token::Nil => Some(()),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -175,6 +182,8 @@ impl Lexer {
                 tokens.push(Token::Minus)
             } else if self.scan(re(r"let\b")).is_some() {
                 tokens.push(Token::Let)
+            } else if self.scan(re(r"nil\b")).is_some() {
+                tokens.push(Token::Nil)
             } else if self.scan(re(r"=")).is_some() {
                 tokens.push(Token::Eq)
             } else if self.scan(re("\"")).is_some() {

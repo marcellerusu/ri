@@ -4,6 +4,8 @@ let b = arr.join(" - ")
 
 fn add(a, b) = a / b
 
-let result = add(b=20, a=40)
+let result = add(b=40, a=20)
 
 [b, result, arr]
+let val = nil
+val
