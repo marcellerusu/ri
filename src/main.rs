@@ -11,8 +11,8 @@ fn eval(file_contents: String) -> Result<(), ParseError> {
             let mut parser = parser::Parser::new(tokens);
             let ast = parser.parse()?;
             let mut interpreter = interpreter::Interpreter::new(ast);
-            let output = interpreter.eval();
-            println!("{:?}", output);
+            let _output = interpreter.eval();
+            // println!("{:?}", output);
         }
         Err(err) => {
             println!("failed to tokenize {:?}", err);

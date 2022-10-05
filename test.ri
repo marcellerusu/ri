@@ -8,4 +8,4 @@ let result = add(b=40, a=20)
 
 [b, result, arr]
 let val = nil
-val
+print(arr)

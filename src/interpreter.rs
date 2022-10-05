@@ -127,7 +127,16 @@ impl Interpreter {
     }
 
     fn fn_call_from_id(&mut self, name: String, args: Vec<AST>) -> Value {
-        if let Some(Fn {
+        if name == "print" {
+            println!(
+                "{}",
+                args.iter()
+                    .map(|expr| format!("{:?}", self.eval_expr(expr.clone())))
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            );
+            Value::Nil
+        } else if let Some(Fn {
             args: fn_args,
             expr,
         }) = self.fns.get(&name)
