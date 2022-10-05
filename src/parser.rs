@@ -18,6 +18,7 @@ pub enum AST {
     Div(Box<AST>, Box<AST>),
     Mul(Box<AST>, Box<AST>),
     Minus(Box<AST>, Box<AST>),
+    NamedArg(String, Box<AST>),
     Id(String),
     Let(Box<AST>, Box<AST>),
     Def(String, Vec<String>, Box<AST>),
@@ -148,15 +149,34 @@ impl Parser {
         self.consume(|t| t.as_fn())?;
         let name = self.consume(|t| t.as_id())?;
         self.consume(|t| t.as_open_paren())?;
-        let args = self.parse_comma_separated_ids()?;
+        let arg_names = self.parse_comma_separated_ids()?;
         self.consume(|t| t.as_eq())?;
         let expr = self.parse_node()?;
-        Ok(AST::Def(name, args, Box::new(expr)))
+        Ok(AST::Def(name, arg_names, Box::new(expr)))
     }
 
     fn parse_fn_call(&mut self, lhs: AST) -> Result<AST, ParseError> {
         self.consume(|t| t.as_open_paren())?;
-        let args = self.parse_comma_separated_exprs(Token::CloseParen)?;
+        let mut args: Vec<AST>;
+        if let (Some(Token::Id(_)), Some(Token::Eq)) = (self.cur(), self.peek()) {
+            args = vec![];
+            loop {
+                let name = self.consume(|t| t.as_id())?;
+                self.consume(|t| t.as_eq())?;
+                let expr = self.parse_node()?;
+                args.push(AST::NamedArg(name, Box::new(expr)));
+                if let Some(token) = self.cur() {
+                    if token == Token::CloseParen {
+                        self.index += 1;
+                        break;
+                    } else if matches!(token, Token::Comma) {
+                        self.index += 1;
+                    }
+                }
+            }
+        } else {
+            args = self.parse_comma_separated_exprs(Token::CloseParen)?;
+        }
         Ok(AST::FnCall(Box::new(lhs), args))
     }
 

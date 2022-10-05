@@ -54,8 +54,9 @@ impl Interpreter {
         }
     }
 
-    fn add_i32(&self, lhs: i32, rhs: &AST) -> Value {
-        if let AST::Num(rhs) = rhs {
+    fn add_i32(&mut self, lhs: i32, rhs: &AST) -> Value {
+        let rhs = self.eval_expr(rhs.clone());
+        if let Value::Int(rhs) = rhs {
             Value::Int(lhs + rhs)
         } else {
             panic!("Expected {:?} to be an int", rhs)
@@ -75,14 +76,6 @@ impl Interpreter {
             panic!("Expected {:?} to be an str {:?}", rhs, self.vars)
         }
     }
-
-    // fn add_value(&self, lhs: Value, rhs: Value) -> Value {
-    //     match (lhs, rhs) {
-    //         (Value::Str(lhs), Value::Str(rhs)) => Value::Str(lhs + &rhs),
-    //         (Value::Int(lhs), Value::Int(rhs)) => Value::Int(lhs + rhs),
-    //         _ => panic!("invalid add"),
-    //     }
-    // }
 
     fn add(&mut self, lhs: &AST, rhs: &AST) -> Value {
         match lhs {
@@ -140,11 +133,30 @@ impl Interpreter {
         }) = self.fns.get(&name)
         {
             let mut context = self.vars.clone();
-            for (arg_name, arg_expr) in fn_args.iter().zip(args) {
-                let expr = self.clone().eval_expr(arg_expr);
-                context.remove_entry(arg_name);
-                context.insert(arg_name.clone(), expr.clone());
+            if args.iter().all(|arg| matches!(arg, AST::NamedArg(_, _))) {
+                let mut names = args.iter().map(|arg| match arg {
+                    AST::NamedArg(name, _) => name,
+                    _ => panic!("unknown"),
+                });
+                assert!(names.len() == fn_args.len() && names.all(|name| fn_args.contains(name)));
+                let args = args.iter().map(|arg| match arg {
+                    AST::NamedArg(name, expr) => {
+                        (name, self.clone().eval_expr(expr.as_ref().clone()))
+                    }
+                    _ => panic!("wtf"),
+                });
+                for (name, expr) in args {
+                    context.remove(name);
+                    context.insert(name.clone(), expr);
+                }
+            } else {
+                for (arg_name, arg_expr) in fn_args.iter().zip(args) {
+                    let expr = self.clone().eval_expr(arg_expr);
+                    context.remove_entry(arg_name);
+                    context.insert(arg_name.clone(), expr.clone());
+                }
             }
+            // println!("calling function with {:?}", context);
 
             Interpreter::new_with_context(vec![expr.clone()], context, self.fns.clone()).eval()
         } else {
@@ -173,14 +185,11 @@ impl Interpreter {
     }
 
     fn fn_call_from_dot(&mut self, lhs: AST, method_name: String, args: Vec<AST>) -> Value {
-        if let AST::Id(var_name) = lhs {
-            if let Some(Value::Array(array)) = self.vars.get(&var_name) {
-                self.call_array_method(method_name, array, args)
-            } else {
-                panic!("Variable {} not found", var_name);
-            }
+        let lhs = self.eval_expr(lhs);
+        if let Value::Array(array) = lhs {
+            self.call_array_method(method_name, &array, args)
         } else {
-            panic!("unimplemented dot function call {:?}", lhs)
+            panic!("Unsupported dot fn call - lhs: {:?}", lhs);
         }
     }
 
@@ -228,6 +237,7 @@ impl Interpreter {
 
             AST::Let(_, _) => todo!("let is not valid expr"),
             AST::Def(_, _, _) => todo!("def is not a valid expr"),
+            AST::NamedArg(_, _) => todo!("named arg is not a valid expr"),
         }
     }
 
