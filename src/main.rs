@@ -22,7 +22,7 @@ fn eval(file_contents: String) -> Result<(), ParseError> {
 }
 
 fn main() {
-    let filename = std::env::args().skip(1).next();
+    let filename = std::env::args().nth(1);
     match filename {
         Some(filename) => {
             let result = std::fs::read_to_string(&filename).unwrap();
@@ -34,5 +34,4 @@ fn main() {
             println!("Please input a filename")
         }
     }
-    ()
 }

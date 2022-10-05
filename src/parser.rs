@@ -12,6 +12,8 @@ pub struct Parser {
 pub enum AST {
     Num(i32),
     Str(String),
+    Array(Vec<AST>),
+    Dot(Box<AST>, String),
     Add(Box<AST>, Box<AST>),
     Div(Box<AST>, Box<AST>),
     Mul(Box<AST>, Box<AST>),
@@ -35,21 +37,20 @@ impl Parser {
     }
 
     fn cur(&self) -> Option<Token> {
-        self.tokens.get(self.index).map(|val| val.clone())
+        self.tokens.get(self.index).cloned()
     }
 
     fn peek(&self) -> Option<Token> {
-        self.tokens.get(self.index + 1).map(|val| val.clone())
+        self.tokens.get(self.index + 1).cloned()
     }
 
     fn consume<T>(&mut self, cond_fn: fn(Token) -> Option<T>) -> Result<T, ParseError> {
         let token = self.cur().ok_or(ParseError::NoMoreTokens)?;
-        if let Some(result) = cond_fn(token.clone()) {
+        if let Some(result) = cond_fn(token) {
             self.index += 1;
             Ok(result)
         } else {
-            println!("Unexpected {:?}", cond_fn);
-            Err(ParseError::Unexpected(token))
+            panic!("Unexpected {:?}", &self.tokens.as_slice()[self.index..]);
         }
     }
 
@@ -72,80 +73,44 @@ impl Parser {
 
     fn parse_plus(&mut self) -> Result<AST, ParseError> {
         let lhs = self.consume_plus_operand()?;
-        self.consume(|t| match t {
-            Token::Plus => Some(()),
-            _ => None,
-        })?;
-        let rhs = self.consume_plus_operand()?;
+        self.consume(|t| t.as_plus())?;
+        let rhs = self.parse_node()?;
         Ok(AST::Add(Box::new(lhs), Box::new(rhs)))
     }
 
     fn parse_mul(&mut self) -> Result<AST, ParseError> {
         let lhs = self.consume_math_operand()?;
-        self.consume(|t| match t {
-            Token::Times => Some(()),
-            _ => None,
-        })?;
+        self.consume(|t| t.as_times())?;
         let rhs = self.consume_math_operand()?;
         Ok(AST::Mul(Box::new(lhs), Box::new(rhs)))
     }
 
     fn parse_div(&mut self) -> Result<AST, ParseError> {
         let lhs = self.consume_math_operand()?;
-        self.consume(|t| match t {
-            Token::Div => Some(()),
-            _ => None,
-        })?;
+        self.consume(|t| t.as_div())?;
         let rhs = self.consume_math_operand()?;
         Ok(AST::Div(Box::new(lhs), Box::new(rhs)))
     }
 
     fn parse_minus(&mut self) -> Result<AST, ParseError> {
         let lhs = self.consume_math_operand()?;
-        self.consume(|t| match t {
-            Token::Minus => Some(()),
-            _ => None,
-        })?;
+        self.consume(|t| t.as_minus())?;
         let rhs = self.consume_math_operand()?;
         Ok(AST::Minus(Box::new(lhs), Box::new(rhs)))
     }
+
     fn parse_let(&mut self) -> Result<AST, ParseError> {
-        self.consume(|t| match t {
-            Token::Let => Some(()),
-            _ => None,
-        })?;
-        let name = self.consume(|t| match t {
-            Token::Id(name) => Some(AST::Id(name)),
-            _ => None,
-        })?;
-        self.consume(|t| match t {
-            Token::Eq => Some(()),
-            _ => None,
-        })?;
+        self.consume(|t| t.as_let())?;
+        let name = self.consume(|t| t.as_id())?;
+        self.consume(|t| t.as_eq())?;
         let rhs = self.parse_node()?;
-        Ok(AST::Let(Box::new(name), Box::new(rhs)))
+        Ok(AST::Let(Box::new(AST::Id(name)), Box::new(rhs)))
     }
 
-    fn parse_def(&mut self) -> Result<AST, ParseError> {
-        self.consume(|t| match t {
-            Token::Fn => Some(()),
-            _ => None,
-        })?;
-        let name = self.consume(|t| match t {
-            Token::Id(name) => Some(name),
-            _ => None,
-        })?;
-        self.consume(|t| match t {
-            Token::OpenParen => Some(()),
-            _ => None,
-        })?;
-        let mut args: Vec<String> = vec![];
+    fn parse_comma_separated_ids(&mut self) -> Result<Vec<String>, ParseError> {
+        let mut names: Vec<String> = vec![];
         loop {
-            let arg_name = self.consume(|t| match t {
-                Token::Id(name) => Some(name),
-                _ => None,
-            })?;
-            args.push(arg_name);
+            names.push(self.consume(|t| t.as_id())?);
             match self.cur() {
                 Some(Token::CloseParen) => {
                     self.index += 1;
@@ -157,43 +122,56 @@ impl Parser {
                 _ => continue,
             }
         }
+        Ok(names)
+    }
 
-        self.consume(|t| match t {
-            Token::Eq => Some(()),
-            _ => None,
-        })?;
+    fn parse_comma_separated_exprs(
+        &mut self,
+        closing_token: Token,
+    ) -> Result<Vec<AST>, ParseError> {
+        let mut exprs: Vec<AST> = vec![];
+        loop {
+            exprs.push(self.parse_node()?);
+            if let Some(token) = self.cur() {
+                if token == closing_token {
+                    self.index += 1;
+                    break;
+                } else if matches!(token, Token::Comma) {
+                    self.index += 1;
+                }
+            }
+        }
+        Ok(exprs)
+    }
 
+    fn parse_def(&mut self) -> Result<AST, ParseError> {
+        self.consume(|t| t.as_fn())?;
+        let name = self.consume(|t| t.as_id())?;
+        self.consume(|t| t.as_open_paren())?;
+        let args = self.parse_comma_separated_ids()?;
+        self.consume(|t| t.as_eq())?;
         let expr = self.parse_node()?;
-
         Ok(AST::Def(name, args, Box::new(expr)))
     }
 
     fn parse_fn_call(&mut self) -> Result<AST, ParseError> {
-        let name = self.consume(|t| match t {
-            Token::Id(fn_name) => Some(fn_name),
-            _ => None,
-        })?;
-        self.consume(|t| match t {
-            Token::OpenParen => Some(()),
-            _ => None,
-        })?;
-
-        let mut args: Vec<AST> = vec![];
-        loop {
-            args.push(self.parse_node()?);
-            match self.cur() {
-                Some(Token::CloseParen) => {
-                    self.index += 1;
-                    break;
-                }
-                Some(Token::Comma) => {
-                    self.index += 1;
-                }
-                _ => continue,
-            }
-        }
-
+        let name = self.consume(|t| t.as_id())?;
+        self.consume(|t| t.as_open_paren())?;
+        let args = self.parse_comma_separated_exprs(Token::CloseParen)?;
         Ok(AST::FnCall(name, args))
+    }
+
+    fn parse_array(&mut self) -> Result<AST, ParseError> {
+        self.consume(|t| t.as_open_sq())?;
+        let array = self.parse_comma_separated_exprs(Token::CloseSq)?;
+        Ok(AST::Array(array))
+    }
+
+    fn parse_dot(&mut self) -> Result<AST, ParseError> {
+        let lhs_name = self.consume(|t| t.as_id())?;
+        self.consume(|t| t.as_dot())?;
+        let property = self.consume(|t| t.as_id())?;
+        Ok(AST::Dot(Box::new(AST::Id(lhs_name)), property))
     }
 
     fn parse_node(&mut self) -> Result<AST, ParseError> {
@@ -202,25 +180,17 @@ impl Parser {
             (_, Some(Token::Minus)) => self.parse_minus(),
             (_, Some(Token::Div)) => self.parse_div(),
             (_, Some(Token::Times)) => self.parse_mul(),
+            (Some(Token::Id(_)), Some(Token::Dot)) => self.parse_dot(),
             (Some(Token::Id(_)), Some(Token::OpenParen)) => self.parse_fn_call(),
+            (Some(Token::Num(_)), _) => self.consume(|t| t.as_num().map(AST::Num)),
+            (Some(Token::Str(_)), _) => self.consume(|t| t.as_str().map(AST::Str)),
+            (Some(Token::Id(_)), _) => self.consume(|t| t.as_id().map(AST::Id)),
             (Some(Token::Fn), _) => self.parse_def(),
             (Some(Token::Let), Some(Token::Id(_))) => self.parse_let(),
-            (Some(Token::Num(_)), _) => self.consume(|t| match t {
-                Token::Num(num) => Some(AST::Num(num)),
-                _ => None,
-            }),
-            (Some(Token::Str(_)), _) => self.consume(|t| match t {
-                Token::Str(string) => Some(AST::Str(string)),
-                _ => None,
-            }),
-            (Some(Token::Id(_)), _) => self.consume(|t| match t {
-                Token::Id(name) => Some(AST::Id(name)),
-                _ => None,
-            }),
+            (Some(Token::OpenSq), _) => self.parse_array(),
             (None, _) => Err(ParseError::NoMoreTokens),
             _ => {
-                println!("Unimplemented token");
-                Err(ParseError::Unexpected(self.cur().unwrap()))
+                panic!("Unimplemented token {:?} {:?}", self.cur(), self.peek())
             }
         }
     }
@@ -230,6 +200,6 @@ impl Parser {
         while self.index < self.tokens.len() {
             ast.push(self.parse_node()?);
         }
-        return Ok(ast);
+        Ok(ast)
     }
 }
