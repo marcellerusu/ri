@@ -139,53 +139,61 @@ impl Interpreter {
         Value::Nil
     }
 
+    fn fn_call_from_id(&mut self, name: String, args: Vec<AST>) -> Value {
+        if let Some(Fn {
+            args: fn_args,
+            expr,
+        }) = self.fns.get(&name)
+        {
+            let mut context = self.vars.clone();
+            for (arg_name, arg_expr) in fn_args.iter().zip(args) {
+                let expr = self.clone().eval_expr(arg_expr);
+                context.remove_entry(arg_name);
+                context.insert(arg_name.clone(), expr.clone());
+            }
+
+            Interpreter::new_with_context(vec![expr.clone()], context, self.fns.clone()).eval()
+        } else {
+            panic!("Function not found {}", name);
+        }
+    }
+
+    fn call_array_method(&self, method_name: String, array: &Vec<Value>, args: Vec<AST>) -> Value {
+        match method_name.as_str() {
+            "join" => {
+                assert!(args.len() == 1);
+                if let Some(AST::Str(join_str)) = args.first() {
+                    let str_arr: Vec<String> =
+                        Vec::from_iter(array.iter().map(|node| match node {
+                            Value::Int(int) => int.to_string(),
+                            Value::Str(string) => string.to_string(),
+                            _ => todo!("join on non str | int"),
+                        }));
+                    return Value::Str(str_arr.join(join_str));
+                } else {
+                    panic!("expected a string for join")
+                }
+            }
+            name => panic!("Unknown array method {}", name),
+        }
+    }
+
+    fn fn_call_from_dot(&mut self, lhs: AST, method_name: String, args: Vec<AST>) -> Value {
+        if let AST::Id(var_name) = lhs {
+            if let Some(Value::Array(array)) = self.vars.get(&var_name) {
+                self.call_array_method(method_name, array, args)
+            } else {
+                panic!("Variable {} not found", var_name);
+            }
+        } else {
+            panic!("unimplemented dot function call {:?}", lhs)
+        }
+    }
+
     fn fn_call(&mut self, lhs: AST, args: Vec<AST>) -> Value {
         match lhs {
-            AST::Id(name) => {
-                if let Some(Fn {
-                    args: fn_args,
-                    expr,
-                }) = self.fns.get(&name)
-                {
-                    let mut context = self.vars.clone();
-                    for (arg_name, arg_expr) in fn_args.iter().zip(args) {
-                        let expr = self.clone().eval_expr(arg_expr);
-                        context.remove_entry(arg_name);
-                        context.insert(arg_name.clone(), expr.clone());
-                    }
-
-                    Interpreter::new_with_context(vec![expr.clone()], context, self.fns.clone())
-                        .eval()
-                } else {
-                    panic!("Function not found {}", name);
-                }
-            }
-            AST::Dot(lhs, method_name) => {
-                if method_name != "join" {
-                    panic!("only supporting join");
-                }
-                let lhs = lhs.as_ref();
-                if let AST::Id(var_name) = lhs {
-                    if let Some(Value::Array(array)) = self.vars.get(var_name) {
-                        assert!(args.len() == 1);
-                        if let Some(AST::Str(join_str)) = args.first() {
-                            let str_arr: Vec<String> =
-                                Vec::from_iter(array.iter().map(|node| match node {
-                                    Value::Int(int) => int.to_string(),
-                                    Value::Str(string) => string.to_string(),
-                                    _ => todo!("join on non str | int"),
-                                }));
-                            return Value::Str(str_arr.join(join_str));
-                        } else {
-                            panic!("expected a string for join")
-                        }
-                    } else {
-                        panic!("Variable {} not found", var_name);
-                    }
-                } else {
-                    panic!("unimplemented dot function call {:?}", lhs)
-                }
-            }
+            AST::Id(name) => self.fn_call_from_id(name, args),
+            AST::Dot(lhs, method_name) => self.fn_call_from_dot(*lhs, method_name, args),
             _ => {
                 panic!("Unknown function expression {:?}", lhs);
             }
