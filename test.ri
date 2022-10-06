@@ -1,5 +1,6 @@
 class Lexer(program_string)
-  fn hello = "program: " + program_string 
+  fn other = "oh yea"
+  fn hello = "program: " + other()
 end
 
 let lexer = new Lexer("let a = 10")

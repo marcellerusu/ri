@@ -85,7 +85,7 @@ impl Interpreter {
         }
     }
 
-    fn add_str(&self, lhs: String, rhs: &AST) -> Value {
+    fn add_str(&mut self, lhs: String, rhs: &AST) -> Value {
         if let AST::Str(rhs) = rhs {
             Value::Str(lhs + rhs)
         } else if let AST::Id(name) = rhs {
@@ -93,6 +93,13 @@ impl Interpreter {
                 Value::Str(lhs + rhs)
             } else {
                 panic!("Expected {:?} to be an str {:?}", rhs, self.vars)
+            }
+        } else if let AST::FnCall(call_lhs, args) = rhs {
+            let rhs = self.fn_call(call_lhs.as_ref().clone(), args.clone());
+            if let Value::Str(string) = rhs {
+                Value::Str(lhs + string.as_str())
+            } else {
+                panic!("expected fn call to be string");
             }
         } else {
             panic!("Expected {:?} to be an str {:?}", rhs, self.vars)
@@ -277,14 +284,11 @@ impl Interpreter {
                     context.remove(name);
                     context.insert(name.clone(), self.eval_expr(expr));
                 }
+                let mut obj_fns = self.fns.clone();
+                obj_fns.extend(def.methods.clone());
 
-                Interpreter::new_with_context(
-                    body.clone(),
-                    context,
-                    self.fns.clone(),
-                    self.classes.clone(),
-                )
-                .eval()
+                Interpreter::new_with_context(body.clone(), context, obj_fns, self.classes.clone())
+                    .eval()
             } else {
                 panic!("not a function");
             }
