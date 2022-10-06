@@ -1,3 +1,4 @@
+use core::panic;
 use std::vec;
 
 use crate::lexer::Token;
@@ -9,7 +10,9 @@ pub struct Parser {
 }
 
 #[derive(Debug, Clone)]
-pub enum ClassEntry {}
+pub enum ClassEntry {
+    Method(String, Vec<String>, Vec<AST>),
+}
 
 #[derive(Debug, Clone)]
 pub enum AST {
@@ -138,6 +141,10 @@ impl Parser {
         closing_token: Token,
     ) -> Result<Vec<AST>, ParseError> {
         let mut exprs: Vec<AST> = vec![];
+        if self.cur().unwrap() == closing_token {
+            self.index += 1;
+            return Ok(exprs);
+        }
         loop {
             exprs.push(self.parse_node()?);
             if let Some(token) = self.cur() {
@@ -152,11 +159,14 @@ impl Parser {
         Ok(exprs)
     }
 
-    fn parse_def(&mut self) -> Result<AST, ParseError> {
+    fn parse_fn_def(&mut self) -> Result<AST, ParseError> {
         self.consume(|t| t.as_fn())?;
         let name = self.consume(|t| t.as_id())?;
-        self.consume(|t| t.as_open_paren())?;
-        let arg_names = self.parse_comma_separated_ids()?;
+        let mut arg_names: Vec<String> = vec![];
+        if matches!(self.cur(), Some(Token::OpenParen)) {
+            self.consume(|t| t.as_open_paren())?;
+            arg_names = self.parse_comma_separated_ids()?;
+        }
         let mut body: Vec<AST> = vec![];
         if matches!(self.cur(), Some(Token::Eq)) {
             self.consume(|t| t.as_eq())?;
@@ -177,6 +187,10 @@ impl Parser {
         if let (Some(Token::Id(_)), Some(Token::Eq)) = (self.cur(), self.peek()) {
             args = vec![];
             loop {
+                if matches!(self.cur(), Some(Token::CloseParen)) {
+                    self.index += 1;
+                    break;
+                }
                 let name = self.consume(|t| t.as_id())?;
                 self.consume(|t| t.as_eq())?;
                 let expr = self.parse_node()?;
@@ -202,13 +216,30 @@ impl Parser {
         Ok(AST::Array(array))
     }
 
+    fn parse_class_entry(&mut self) -> Result<ClassEntry, ParseError> {
+        match self.cur() {
+            Some(Token::Fn) => {
+                if let AST::Def(name, args, body) = self.parse_fn_def()? {
+                    Ok(ClassEntry::Method(name, args, body))
+                } else {
+                    panic!("unable to parse function");
+                }
+            }
+            _ => panic!("unsupported class entry {:?}", self.cur()),
+        }
+    }
+
     fn parse_class(&mut self) -> Result<AST, ParseError> {
         self.consume(|t| t.as_class())?;
         let name = self.consume(|t| t.as_id())?;
         self.consume(|t| t.as_open_paren())?;
         let vars = self.parse_comma_separated_ids()?;
+        let mut entries = vec![];
+        while !matches!(self.cur(), Some(Token::End)) {
+            entries.push(self.parse_class_entry()?);
+        }
         self.consume(|t| t.as_end())?;
-        Ok(AST::Class(name, vars, vec![]))
+        Ok(AST::Class(name, vars, entries))
     }
 
     fn parse_new(&mut self) -> Result<AST, ParseError> {
@@ -244,15 +275,13 @@ impl Parser {
             (Some(Token::Id(_)), _) => self.consume(|t| t.as_id().map(AST::Id)),
             (Some(Token::Sym(_)), _) => self.consume(|t| t.as_sym().map(AST::Sym)),
             (Some(Token::Nil), _) => self.consume(|t| t.as_nil().map(|_| AST::Nil)),
-            (Some(Token::Fn), _) => self.parse_def(),
+            (Some(Token::Fn), _) => self.parse_fn_def(),
             (Some(Token::Let), Some(Token::Id(_))) => self.parse_let(),
             (Some(Token::OpenSq), _) => self.parse_array(),
             (Some(Token::Class), _) => self.parse_class(),
             (Some(Token::New), _) => self.parse_new(),
             (None, _) => Err(ParseError::NoMoreTokens),
-            _ => {
-                panic!("Unimplemented token {:?} {:?}", self.cur(), self.peek())
-            }
+            _ => panic!("Unimplemented token {:?} {:?}", self.cur(), self.peek()),
         }?;
 
         loop {

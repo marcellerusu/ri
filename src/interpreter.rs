@@ -11,7 +11,7 @@ struct Fn {
 #[derive(Clone, Debug)]
 struct ClassDef {
     arg_names: Vec<String>,
-    methods: Vec<Fn>,
+    methods: HashMap<String, Fn>,
 }
 
 #[derive(Clone, Debug)]
@@ -156,15 +156,17 @@ impl Interpreter {
         &mut self,
         name: String,
         arg_names: Vec<String>,
-        _methods: Vec<ClassEntry>,
+        entries: Vec<ClassEntry>,
     ) -> Value {
-        self.classes.insert(
-            name,
-            ClassDef {
-                arg_names,
-                methods: vec![],
-            },
-        );
+        let mut methods: HashMap<String, Fn> = HashMap::new();
+        for method in entries {
+            match method {
+                ClassEntry::Method(name, args, body) => {
+                    methods.insert(name, Fn { args, body });
+                }
+            }
+        }
+        self.classes.insert(name, ClassDef { arg_names, methods });
         Value::Nil
     }
 
@@ -263,6 +265,29 @@ impl Interpreter {
         let lhs = self.eval_expr(lhs);
         if let Value::Array(array) = lhs {
             self.call_array_method(method_name, &array, args)
+        } else if let Value::Object(Object { vars, def }) = lhs {
+            if let Some(Fn {
+                args: arg_names,
+                body,
+            }) = def.methods.get(&method_name)
+            {
+                let mut context = self.vars.clone();
+                context.extend(vars);
+                for (name, expr) in arg_names.iter().zip(args) {
+                    context.remove(name);
+                    context.insert(name.clone(), self.eval_expr(expr));
+                }
+
+                Interpreter::new_with_context(
+                    body.clone(),
+                    context,
+                    self.fns.clone(),
+                    self.classes.clone(),
+                )
+                .eval()
+            } else {
+                panic!("not a function");
+            }
         } else {
             panic!("Unsupported dot fn call - lhs: {:?}", lhs);
         }
