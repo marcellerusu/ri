@@ -9,13 +9,17 @@ pub struct Parser {
 }
 
 #[derive(Debug, Clone)]
+pub enum ClassEntry {}
+
+#[derive(Debug, Clone)]
 pub enum AST {
     Num(i32),
     Str(String),
     Sym(String),
     Array(Vec<AST>),
-    Nil,
+    Class(String, Vec<String>, Vec<ClassEntry>),
     Dot(Box<AST>, String),
+    New(String, Vec<AST>),
     Add(Box<AST>, Box<AST>),
     Div(Box<AST>, Box<AST>),
     Mul(Box<AST>, Box<AST>),
@@ -25,6 +29,7 @@ pub enum AST {
     Let(Box<AST>, Box<AST>),
     Def(String, Vec<String>, Vec<AST>),
     FnCall(Box<AST>, Vec<AST>),
+    Nil,
 }
 
 #[derive(Debug)]
@@ -197,6 +202,23 @@ impl Parser {
         Ok(AST::Array(array))
     }
 
+    fn parse_class(&mut self) -> Result<AST, ParseError> {
+        self.consume(|t| t.as_class())?;
+        let name = self.consume(|t| t.as_id())?;
+        self.consume(|t| t.as_open_paren())?;
+        let vars = self.parse_comma_separated_ids()?;
+        self.consume(|t| t.as_end())?;
+        Ok(AST::Class(name, vars, vec![]))
+    }
+
+    fn parse_new(&mut self) -> Result<AST, ParseError> {
+        self.consume(|t| t.as_new())?;
+        let class_name = self.consume(|t| t.as_id())?;
+        self.consume(|t| t.as_open_paren())?;
+        let args = self.parse_comma_separated_exprs(Token::CloseParen)?;
+        Ok(AST::New(class_name, args))
+    }
+
     fn parse_dot(&mut self, lhs: AST) -> Result<AST, ParseError> {
         self.consume(|t| t.as_dot())?;
         let property = self.consume(|t| t.as_id())?;
@@ -225,6 +247,8 @@ impl Parser {
             (Some(Token::Fn), _) => self.parse_def(),
             (Some(Token::Let), Some(Token::Id(_))) => self.parse_let(),
             (Some(Token::OpenSq), _) => self.parse_array(),
+            (Some(Token::Class), _) => self.parse_class(),
+            (Some(Token::New), _) => self.parse_new(),
             (None, _) => Err(ParseError::NoMoreTokens),
             _ => {
                 panic!("Unimplemented token {:?} {:?}", self.cur(), self.peek())

@@ -1,11 +1,23 @@
+use crate::parser::{ClassEntry, AST};
 use core::panic;
 use std::collections::HashMap;
 
-use crate::parser::AST;
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct Fn {
     args: Vec<String>,
     body: Vec<AST>,
+}
+
+#[derive(Clone, Debug)]
+struct ClassDef {
+    arg_names: Vec<String>,
+    methods: Vec<Fn>,
+}
+
+#[derive(Clone, Debug)]
+pub struct Object {
+    vars: HashMap<String, Value>,
+    def: ClassDef,
 }
 
 #[derive(Clone, Debug)]
@@ -14,6 +26,7 @@ pub enum Value {
     Str(String),
     Sym(String),
     Array(Vec<Value>),
+    Object(Object),
     Nil,
 }
 
@@ -22,6 +35,7 @@ pub struct Interpreter {
     ast: Vec<AST>,
     vars: HashMap<String, Value>,
     fns: HashMap<String, Fn>,
+    classes: HashMap<String, ClassDef>,
 }
 
 impl Interpreter {
@@ -30,6 +44,7 @@ impl Interpreter {
             ast,
             vars: HashMap::new(),
             fns: HashMap::new(),
+            classes: HashMap::new(),
         }
     }
 
@@ -37,8 +52,14 @@ impl Interpreter {
         ast: Vec<AST>,
         vars: HashMap<String, Value>,
         fns: HashMap<String, Fn>,
+        classes: HashMap<String, ClassDef>,
     ) -> Interpreter {
-        Interpreter { ast, vars, fns }
+        Interpreter {
+            ast,
+            vars,
+            fns,
+            classes,
+        }
     }
 
     fn to_i(&self, node: &AST) -> i32 {
@@ -87,6 +108,9 @@ impl Interpreter {
                 Some(Value::Array(_)) => todo!("Array + not implemented yet"),
                 Some(Value::Sym(name)) => todo!("cannot add {:?} to {}", lhs, name),
                 Some(Value::Nil) => panic!("cannot add {:?} to nil", lhs),
+                Some(Value::Object(object)) => {
+                    panic!("cannot add {:?} to object {:?}", lhs, object)
+                }
                 None => panic!("Could not find variable {}", lhs_name),
             },
             AST::Str(lhs) => self.add_str(lhs.clone(), rhs),
@@ -123,9 +147,43 @@ impl Interpreter {
         }
     }
 
-    fn define(&mut self, name: String, args: Vec<String>, body: Vec<AST>) -> Value {
+    fn define_fn(&mut self, name: String, args: Vec<String>, body: Vec<AST>) -> Value {
         self.fns.insert(name, Fn { args, body });
         Value::Nil
+    }
+
+    fn define_class(
+        &mut self,
+        name: String,
+        arg_names: Vec<String>,
+        _methods: Vec<ClassEntry>,
+    ) -> Value {
+        self.classes.insert(
+            name,
+            ClassDef {
+                arg_names,
+                methods: vec![],
+            },
+        );
+        Value::Nil
+    }
+
+    fn new_class(&mut self, class_name: String, args: Vec<AST>) -> Value {
+        if let Some(ClassDef { arg_names, methods }) = self.classes.get(&class_name) {
+            let mut vars: HashMap<String, Value> = HashMap::new();
+            for (expr, name) in args.iter().zip(arg_names) {
+                vars.insert(name.clone(), self.clone().eval_expr(expr.clone()));
+            }
+            Value::Object(Object {
+                vars,
+                def: ClassDef {
+                    arg_names: arg_names.clone(),
+                    methods: methods.clone(),
+                },
+            })
+        } else {
+            panic!("new");
+        }
     }
 
     fn fn_call_from_id(&mut self, name: String, args: Vec<AST>) -> Value {
@@ -169,7 +227,13 @@ impl Interpreter {
             }
             // println!("calling function with {:?}", context);
 
-            Interpreter::new_with_context(body.to_vec(), context, self.fns.clone()).eval()
+            Interpreter::new_with_context(
+                body.to_vec(),
+                context,
+                self.fns.clone(),
+                self.classes.clone(),
+            )
+            .eval()
         } else {
             panic!("Function not found {}", name);
         }
@@ -247,6 +311,8 @@ impl Interpreter {
                     panic!("expected lhs of {:?}.{:?} to be an id", lhs, rhs);
                 }
             }
+            AST::Class(name, args, entries) => self.define_class(name, args, entries),
+            AST::New(class_name, args) => self.new_class(class_name, args),
 
             AST::Let(_, _) => todo!("let is not valid expr"),
             AST::Def(_, _, _) => todo!("def is not a valid expr"),
@@ -259,7 +325,7 @@ impl Interpreter {
         for node in self.ast.clone() {
             result = match node {
                 AST::Let(id, expr) => self.assign(id.as_ref(), expr.as_ref()),
-                AST::Def(name, args, body) => self.define(name, args, body),
+                AST::Def(name, args, body) => self.define_fn(name, args, body),
                 _ => self.eval_expr(node),
             }
         }

@@ -31,6 +31,8 @@ pub enum Token {
     Dot,
     Nil,
     End,
+    Class,
+    New,
 }
 
 impl Token {
@@ -148,6 +150,18 @@ impl Token {
             _ => None,
         }
     }
+    pub fn as_class(&self) -> Option<()> {
+        match self {
+            Token::Class => Some(()),
+            _ => None,
+        }
+    }
+    pub fn as_new(&self) -> Option<()> {
+        match self {
+            Token::New => Some(()),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -192,6 +206,10 @@ impl Lexer {
                 tokens.push(Token::Dot)
             } else if self.scan(re(r"end\b")).is_some() {
                 tokens.push(Token::End)
+            } else if self.scan(re(r"class\b")).is_some() {
+                tokens.push(Token::Class)
+            } else if self.scan(re(r"new\b")).is_some() {
+                tokens.push(Token::New)
             } else if self.scan(re(r"/")).is_some() {
                 tokens.push(Token::Div)
             } else if self.scan(re(r"\-")).is_some() {

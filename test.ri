@@ -1,15 +1,6 @@
-let arr = [1, 2, "3"]
-
-let b = arr.join(" - ")
-
-fn add(a, b)
-  a / b
+class Lexer(program_string)
 end
 
-let result = add(b=20, a=40)
+let lexer = new Lexer("let a = 10")
 
-let val = nil
-[b, result, arr]
-print(:result)
-
-print(add(b=2, a=1))
+print(lexer)
