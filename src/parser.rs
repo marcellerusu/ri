@@ -12,6 +12,7 @@ pub struct Parser {
 pub enum AST {
     Num(i32),
     Str(String),
+    Sym(String),
     Array(Vec<AST>),
     Nil,
     Dot(Box<AST>, String),
@@ -219,6 +220,7 @@ impl Parser {
             (Some(Token::Num(_)), _) => self.consume(|t| t.as_num().map(AST::Num)),
             (Some(Token::Str(_)), _) => self.consume(|t| t.as_str().map(AST::Str)),
             (Some(Token::Id(_)), _) => self.consume(|t| t.as_id().map(AST::Id)),
+            (Some(Token::Sym(_)), _) => self.consume(|t| t.as_sym().map(AST::Sym)),
             (Some(Token::Nil), _) => self.consume(|t| t.as_nil().map(|_| AST::Nil)),
             (Some(Token::Fn), _) => self.parse_def(),
             (Some(Token::Let), Some(Token::Id(_))) => self.parse_let(),

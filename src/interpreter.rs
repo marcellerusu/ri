@@ -12,6 +12,7 @@ struct Fn {
 pub enum Value {
     Int(i32),
     Str(String),
+    Sym(String),
     Array(Vec<Value>),
     Nil,
 }
@@ -84,7 +85,8 @@ impl Interpreter {
                 Some(Value::Int(lhs)) => self.add_i32(*lhs, rhs),
                 Some(Value::Str(lhs)) => self.add_str(lhs.clone(), rhs),
                 Some(Value::Array(_)) => todo!("Array + not implemented yet"),
-                Some(Value::Nil) => panic!("Can not add {:?} to nil", lhs),
+                Some(Value::Sym(name)) => todo!("cannot add {:?} to {}", lhs, name),
+                Some(Value::Nil) => panic!("cannot add {:?} to nil", lhs),
                 None => panic!("Could not find variable {}", lhs_name),
             },
             AST::Str(lhs) => self.add_str(lhs.clone(), rhs),
@@ -173,7 +175,7 @@ impl Interpreter {
         }
     }
 
-    fn call_array_method(&self, method_name: String, array: &Vec<Value>, args: Vec<AST>) -> Value {
+    fn call_array_method(&self, method_name: String, array: &[Value], args: Vec<AST>) -> Value {
         match method_name.as_str() {
             "join" => {
                 assert!(args.len() == 1);
@@ -184,7 +186,7 @@ impl Interpreter {
                             Value::Str(string) => string.to_string(),
                             _ => todo!("join on non str | int"),
                         }));
-                    return Value::Str(str_arr.join(join_str));
+                    Value::Str(str_arr.join(join_str))
                 } else {
                     panic!("Expected a string for join")
                 }
@@ -222,6 +224,7 @@ impl Interpreter {
                 Some(value) => value.clone(),
                 None => panic!("Var not found {}", name),
             },
+            AST::Sym(name) => Value::Sym(name),
             AST::FnCall(lhs, args) => self.fn_call(*lhs, args),
             AST::Str(string) => Value::Str(string),
             AST::Array(array) => {
@@ -229,7 +232,7 @@ impl Interpreter {
                 Value::Array(value)
             }
             AST::Dot(lhs, rhs) => {
-                let lhs = self.eval_expr(*lhs.clone());
+                let lhs = self.eval_expr((*lhs).clone());
                 if let Value::Array(array) = lhs {
                     match rhs.as_str() {
                         "length" => Value::Int(array.len() as i32),

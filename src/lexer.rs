@@ -15,6 +15,7 @@ pub enum Token {
     Num(i32),
     Str(String),
     Id(String),
+    Sym(String),
     Fn,
     OpenParen,
     CloseParen,
@@ -48,6 +49,12 @@ impl Token {
     pub fn as_id(&self) -> Option<String> {
         match self {
             Token::Id(name) => Some(name.clone()),
+            _ => None,
+        }
+    }
+    pub fn as_sym(&self) -> Option<String> {
+        match self {
+            Token::Sym(name) => Some(name.clone()),
             _ => None,
         }
     }
@@ -169,9 +176,7 @@ impl Lexer {
         let mut tokens: Vec<Token> = vec![];
         while self.index < self.program.len() {
             // println!("{:?}", self.index);
-            if self.scan(re(r"\s+")).is_some() {
-                continue;
-            } else if self.scan(re(r"#.*")).is_some() {
+            if self.scan(re(r"\s+")).is_some() || self.scan(re(r"#.*")).is_some() {
                 continue;
             } else if let Some(digit) = self.scan(re(r"\d+")) {
                 tokens.push(Token::Num(digit.parse::<i32>().unwrap()))
@@ -213,6 +218,8 @@ impl Lexer {
                 tokens.push(Token::OpenParen)
             } else if self.scan(re(r"\)")).is_some() {
                 tokens.push(Token::CloseParen)
+            } else if let Some(name) = self.scan(re(r":[a-zA-Z_]+")) {
+                tokens.push(Token::Sym(name))
             } else if let Some(name) = self.scan(re(r"[a-zA-Z_]+")) {
                 tokens.push(Token::Id(name))
             } else if self.scan(re(r",")).is_some() {
